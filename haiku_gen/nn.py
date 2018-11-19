@@ -1,0 +1,74 @@
+from keras.models import Sequential
+from keras.layers import SimpleRNN, Dense, Activation
+from keras.layers import LeakyReLU
+from keras.activations import softmax
+
+import haiku_gen.util as u
+import numpy as np
+import numpy.random as rnd
+
+
+def generator(data: np.array, ts_enc: u.TimeseriesEncoder, batch_size: int,
+              random_seed=123):
+
+    counter = 0
+    rnd.seed(random_seed)
+    index = rnd.permutation(data.shape[0])
+
+    while True:
+        batch_start = counter * batch_size
+        batch_end = (counter + 1) * batch_size
+        batch_index = index[batch_start: batch_end]
+        batch = data[batch_index]
+        x_data, y_data = ts_enc.transform(batch)
+        yield x_data, y_data
+
+        counter += 1
+
+        if np.ceil(len(data) / batch_size) <= counter:
+            counter = 0
+            index = rnd.permutation(data.shape[0])
+
+
+def tensor_shape(ts_enc: u.TimeseriesEncoder, batch) -> (int, int, int):
+    return ts_enc.transform(batch)[0].shape
+
+
+def encoded_shape(ts_enc: u.TimeseriesEncoder) -> int:
+    return len(ts_enc.char2int)
+
+
+def main():
+    d = u.load_data()
+
+    batch_size = 10
+    window = 5
+    num_elements = 10000
+    epochs = 10
+    steps_per_epoch = num_elements // batch_size
+
+    d_batch = d[:batch_size]
+    ts_enc = u.TimeseriesEncoder(d, window)
+    batch_shape = tensor_shape(ts_enc, d_batch)
+    output_shape = encoded_shape(ts_enc)
+
+    model = Sequential()
+    model.add(SimpleRNN(units=400, batch_input_shape=batch_shape))
+    model.add(Dense(units=200))
+    model.add(LeakyReLU())
+    model.add(Dense(units=output_shape, activation='softmax'))
+    model.compile(optimizer='adam', loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+
+    g = generator(data=d[:num_elements], ts_enc=ts_enc, batch_size=batch_size)
+    model.fit_generator(g, steps_per_epoch=steps_per_epoch, epochs=epochs)
+
+    import os
+    os.makedirs('model', exist_ok=True)
+    model_name = 'arch={arch}-epochs={epochs}-num_elements={num_elements}-window={window}-batch_size={batch_size}.hdf5'
+    model.save('model/' + model_name.format(arch='SimpleRNN', epochs=epochs, num_elements=num_elements, window=window,
+                                            batch_size=batch_size))
+
+
+if __name__ == '__main__':
+    main()
