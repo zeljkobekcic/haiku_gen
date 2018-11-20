@@ -1,7 +1,7 @@
 import haiku_gen.preprocessing.util as u
 import haiku_gen.preprocessing.multiprocessing_util as mp_u
 
-from preprocessing.util import remove_special_characters, string_to_lower, to_short_and_none, remove_none
+from haiku_gen.preprocessing.util import remove_special_characters, string_to_lower, to_short_and_none, remove_none
 
 
 def main():
