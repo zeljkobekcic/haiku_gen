@@ -98,7 +98,7 @@ def create_timeseries(datapoint: np.array, window: int) -> np.array:
 
     :param datapoint:
     :param window:
-    :return: A timeseries from a datapoint.
+    :return: A timeseries from a datapoint
     """
 
     def timecell(offset):
