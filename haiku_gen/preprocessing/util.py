@@ -1,11 +1,9 @@
 import re
-
 import numpy as np
-from argparse import ArgumentParser
-from os.path import expanduser
 from os import listdir
 from numpy import array, random as random
 from pickle import dump
+from hyphenate import hyphenate_word
 
 
 def availiable_data(path: str):
@@ -29,29 +27,6 @@ def load_available_data(path: str):
 def save_to(output_path: str, object):
     with open(output_path, 'wb') as outfile:
         dump(object, outfile)
-
-
-class PreprocessingArgumentParser(object):
-
-    def __init__(self):
-        argument_parser = ArgumentParser()
-        argument_parser.add_argument('--output', type=str, metavar='OUT_DIR',
-                                     help='Absolute path to the output directory. Will be created if not existing')
-        argument_parser.add_argument('--input', type=str, metavar='INP_DIR',
-                                     help='Absolute path to the input directory with the raw data.')
-
-        parser = argument_parser.parse_args()
-
-        self.argument_parser = argument_parser
-        self.parser = parser
-
-    def get_input(self):
-        input = expanduser(self.parser.input)
-        return input
-
-    def get_output(self):
-        output = expanduser(self.parser.output)
-        return output
 
 
 def create_split(data_size, split_ratio=(.5, .5), random_seed=123):
@@ -90,3 +65,32 @@ def to_short_and_none(string: str) -> str:
 
 def remove_none(data: list) -> list:
     return [x for x in data if x is not None]
+
+
+def verify_haiku_except_none(haiku):
+    if haiku is None:
+        return None
+    else:
+        eval = verify_haiku(haiku)
+        if not eval:
+            return None
+        else:
+            return eval
+
+
+def verify_haiku(haiku: str) -> bool:
+    lines = [l.split(' ') for l in haiku.splitlines()]
+    syllables_per_line = [count_syllables_for_line(l) for l in lines]
+    valid_haiku = [5, 7, 5]
+
+    return syllables_per_line == valid_haiku
+
+
+def count_syllables_for_line(words: [str]) -> int:
+    return sum(map(count_syllables, words))
+
+
+def count_syllables(word: str) -> int:
+    hypenated = hyphenate_word(word)
+    hypens = len(hypenated)
+    return hypens

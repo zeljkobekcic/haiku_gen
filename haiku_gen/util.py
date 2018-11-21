@@ -132,6 +132,13 @@ def create_y_for(datapoint: [str]) -> [str]:
     return y
 
 
+def save_model(model, naming_params):
+    import os
+    os.makedirs('model', exist_ok=True)
+    model_name = 'arch={arch}-epochs={epochs}-num_elements={num_elements}-window={window}-batch_size={batch_size}.hdf5'
+    model.save('model/' + model_name.format(**naming_params))
+
+
 class TimeseriesEncoder:
 
     def __init__(self, x_data, window=5):

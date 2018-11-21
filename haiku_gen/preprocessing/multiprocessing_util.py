@@ -1,5 +1,5 @@
 from functools import reduce
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 
 class MultiProcessingDatastructure:
@@ -18,7 +18,8 @@ def apply_pipeline(obj: MultiProcessingDatastructure):
     return reduce(lambda x, f: f(x), obj.pipeline, obj.haiku)
 
 
-def multiprocess_data(data, pipeline, n_processes=4):
+def multiprocess_data(data, pipeline, n_processes=cpu_count()):
+    print(cpu_count())
     with Pool(n_processes) as p:
         g = multiprocessing_generator(data, pipeline)
         mapped = p.map(apply_pipeline, g)

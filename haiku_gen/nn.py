@@ -1,15 +1,13 @@
 from keras.models import Sequential
-from keras.layers import SimpleRNN, Dense, Activation
+from keras.layers import SimpleRNN, Dense
 from keras.layers import LeakyReLU
-from keras.activations import softmax
 
 import haiku_gen.util as u
 import numpy as np
 import numpy.random as rnd
 
 
-def generator(data: np.array, ts_enc: u.TimeseriesEncoder, batch_size: int,
-              random_seed=123):
+def generator(data: np.array, ts_enc: u.TimeseriesEncoder, batch_size: int, random_seed=123):
 
     counter = 0
     rnd.seed(random_seed)
@@ -43,8 +41,8 @@ def main():
 
     batch_size = 10
     window = 5
-    num_elements = 10000
-    epochs = 10
+    num_elements = 100
+    epochs = 1
     steps_per_epoch = num_elements // batch_size
 
     d_batch = d[:batch_size]
@@ -57,17 +55,15 @@ def main():
     model.add(Dense(units=200))
     model.add(LeakyReLU())
     model.add(Dense(units=output_shape, activation='softmax'))
-    model.compile(optimizer='adam', loss='categorical_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     g = generator(data=d[:num_elements], ts_enc=ts_enc, batch_size=batch_size)
     model.fit_generator(g, steps_per_epoch=steps_per_epoch, epochs=epochs)
 
-    import os
-    os.makedirs('model', exist_ok=True)
-    model_name = 'arch={arch}-epochs={epochs}-num_elements={num_elements}-window={window}-batch_size={batch_size}.hdf5'
-    model.save('model/' + model_name.format(arch='SimpleRNN', epochs=epochs, num_elements=num_elements, window=window,
-                                            batch_size=batch_size))
+    naming_params = {'arch': 'SimpleRNN', 'epochs': epochs, 'num_elements': num_elements, 'window': window,
+                     'batch_size': batch_size}
+
+    u.save_model(model, naming_params)
 
 
 if __name__ == '__main__':
