@@ -48,7 +48,7 @@ def is_too_short(datapoint: str, size=10) -> bool:
 
 
 def remove_special_characters(data: str) -> str:
-    regex = r'[^a-zA-Z\ \n]'
+    regex = r'[^a-zA-Z \n]'
     return str(re.sub(regex, '', data))
 
 
@@ -56,7 +56,7 @@ def string_to_lower(string: str) -> str:
     return string.lower()
 
 
-def to_short_and_none(string: str) -> str:
+def too_short_except_none(string: str) -> str:
     if is_too_short(string):
         return None
     else:
@@ -94,3 +94,39 @@ def count_syllables(word: str) -> int:
     hypenated = hyphenate_word(word)
     hypens = len(hypenated)
     return hypens
+
+
+def whitespace_character_groups(text: str) -> str:
+    special_chars = '([^a-zA-Z0-9 ]+)'
+    alpha_num = '([a-zA-Z0-9]+)'
+
+    whitespaced = re.sub(special_chars + alpha_num, r'\1 \2', text)
+    whitespaced = re.sub(alpha_num + special_chars, r'\1 \2', whitespaced)
+    return whitespaced
+
+
+def intersperse(iterable, delimiter):
+    """
+    TAKEN FROM:
+    https://stackoverflow.com/questions/5655708/python-most-elegant-way-to-intersperse-a-list-with-an-element
+    :return:
+    """
+    it = iter(iterable)
+    yield next(it)
+    for x in it:
+        yield delimiter
+        yield x
+
+
+def split_by_syllables(text: str) -> str:
+    splitted = intersperse(text.split(' '), ' ')
+    return [s for w in splitted for s in hyphenate_word(w)]
+
+
+def split_by_words(text: str) -> str:
+    splitted = intersperse(text.split(' '), ' ')
+    return [s for s in splitted]
+
+
+def split_by_characters(text: str) -> str:
+    return list(text)

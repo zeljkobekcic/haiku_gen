@@ -19,7 +19,6 @@ def apply_pipeline(obj: MultiProcessingDatastructure):
 
 
 def multiprocess_data(data, pipeline, n_processes=cpu_count()):
-    print(cpu_count())
     with Pool(n_processes) as p:
         g = multiprocessing_generator(data, pipeline)
         mapped = p.map(apply_pipeline, g)
