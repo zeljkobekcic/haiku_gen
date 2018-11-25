@@ -39,4 +39,3 @@ def test_mapping_char_to_int():
 
     for c in validation_data:
         assert c == output_int_2_char[output_char_2_int[c]]
-
