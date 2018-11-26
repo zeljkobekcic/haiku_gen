@@ -6,24 +6,15 @@ from keras.utils import to_categorical
 
 
 def load_data_from(path):
+    print(path)
     with open(path, 'rb') as infile:
         return p.load(infile)
 
 
-def load_data():
+def load_data(method):
 
-    local_path = 'data/train.pkl'
-    floydhub_path = '/data/train.pkl'
-
-    try:
-        return load_data_from(local_path)
-    except FileNotFoundError:
-        return load_data_from(floydhub_path)
-
-
-def load_test_data():
-    local_path = 'data/test.pkl'
-    floydhub_path = '/data/test.pkl'
+    local_path = f'data/train_{method}.pkl'
+    floydhub_path = f'/data/train_{method}.pkl'
 
     try:
         return load_data_from(local_path)
@@ -31,33 +22,32 @@ def load_test_data():
         return load_data_from(floydhub_path)
 
 
-def encode_data(data: [str], mapping: {str: int}) -> [np.array]:
-    """
-    Enocdes strings with a given mapping.
+def load_test_data(method):
+    local_path = f'data/train_{method}.pkl'
+    floydhub_path = f'/data/train_{method}.pkl'
 
-    :param data: A collection of strings. Must be iterable
-    :param mapping:  A dictionary which maps all characters in data to a number.
-    :return: A list on matrices of one-hot-encoded characters.
-    """
-    encode = partial(encode_string, mapping=mapping)
-    encoded_data_generator = [encode(d) for d in data]
-    return encoded_data_generator
+    try:
+        return load_data_from(local_path)
+    except FileNotFoundError:
+        return load_data_from(floydhub_path)
 
 
-def encode_string(datapoint: str, mapping: {str: int}) -> np.array:
-    """
-    One-hot-encodes a string with the given mapping.
-
-    :param datapoint: A string
-    :param mapping: A dictionary which maps all characters in the datapoint to a number.
-    :return: A numpy array which represents every character of the given string as a one-hot encoded vector.
-    """
-    encoded = [mapping[c] for c in datapoint]
-    classes_num = len(mapping)
-    return to_categorical(encoded, classes_num)
+def encode_datapoint(datapoint: list, mapping: dict) -> list:
+    return to_categorical([mapping[d] for d in datapoint],
+                          len(mapping),
+                          dtype='int')
 
 
-def character_set_on_data(data: [str]) -> {str}:
+def encode_data(data: [list], mapping: dict) -> [list]:
+    encoded = [encode_datapoint(datapoint, mapping) for datapoint in data]
+    return np.array(encoded)
+
+
+#TODO:
+# ALL BELOW THIS NEEDS TO BE REWRITTEN
+# WITH TDD <3
+
+def character_set_on_data(data: list) -> dict:
     """
     Creates a set of characters over a collection of strings.
     :param data: A collection of strings.
