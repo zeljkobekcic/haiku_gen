@@ -43,11 +43,7 @@ def encode_data(data: [list], mapping: dict) -> [list]:
     return np.array(encoded)
 
 
-#TODO:
-# ALL BELOW THIS NEEDS TO BE REWRITTEN
-# WITH TDD <3
-
-def character_set_on_data(data: list) -> dict:
+def set_of_data_elements(data: list) -> dict:
     """
     Creates a set of characters over a collection of strings.
     :param data: A collection of strings.
@@ -56,69 +52,92 @@ def character_set_on_data(data: list) -> dict:
     return reduce(lambda x, y: x | y, [set(x_i) for x_i in data])
 
 
-def mapping_char_int(data: [str]) -> ({str: int}, {int: str}):
+def mapping_char_int(data: [list]) -> (dict, dict):
     """
     Creates two mappings. One from characters to numbers and one from numbers to characters.
     :param data: A collection os strings.
     :return: Two dictionaries.
     """
-    char_set = character_set_on_data(data)
+    char_set = set_of_data_elements(data)
     char_2_int = {c: i for i, c in enumerate(char_set)}
     int_2_char = {i: c for i, c in enumerate(char_set)}
 
     return char_2_int, int_2_char
 
 
-def create_timecell(datapoint: np.array, offset: int, window: int) -> np.array:
+def create_timecell(datapoint: np.array, offset: int, frame: int) -> np.array:
     """
     Helper function to create timecells for the recurrent neural networks.
 
     :param datapoint:
     :param offset:
-    :param window:
+    :param frame:
     :return: A timecell from a datapoint.
     """
-    timecell = datapoint[offset:offset + window]
+    timecell = datapoint[offset:offset + frame]
     return timecell
 
 
-def create_timeseries(datapoint: np.array, window: int) -> np.array:
+def create_timeseries(datapoint: np.array, frame: int) -> np.array:
     """
     A helper function to create timeseries from datapoints.
 
     :param datapoint:
-    :param window:
+    :param frame:
     :return: A timeseries from a datapoint
     """
 
     def timecell(offset):
-        return create_timecell(datapoint, offset, window)
+        return create_timecell(datapoint, offset, frame)
 
-    timecell_num = len(datapoint) - window + 1
+    timecell_num = len(datapoint) - frame + 1
     timeseries = np.array([timecell(i) for i in range(timecell_num)])
     return timeseries
 
 
-def create_next_tensor(current_datapoint: np.array, predicted: np.array):
-    array_length = predicted.shape[0]
-    next_seq_element = list(current_datapoint[1, 1, array_length:]) + predicted
-    as_tensor = np.array(next_seq_element).reshape((1, 1, -1))
-    return as_tensor
+def add_start_end(data, left, right) -> np.array:
+    x = np.zeros_like(data)
+    for i, v in enumerate(data):
+        x[i] = np.pad(array=np.array(v, dtype=object),
+                      pad_width=(1, 1),
+                      mode='constant',
+                      constant_values=(left, right))
+    return x
 
 
-def unify_data(data: [str], length=None) -> [str]:
+def fill_na(data, fill, length=None):
+    """
+    Taken from: https://stackoverflow.com/a/32043366/3446982 and slightly
+    modified
+    """
+    # Get lengths of each row of data
+    lens = np.array([len(i) for i in data])
+
     if length is None:
-        length = max([len(d) for d in data])
-    same_length = ["<BGN>" + d + "<END>" + (" " * (length + 1 - len(d))) for d in data]
-    return same_length
+        length = lens.max()
+
+    print(length)
+    # Mask of valid places in each row
+    mask = np.arange(length) < lens[:, None]
+
+    # Setup output array and put elements from data into masked positions
+    out = np.full(mask.shape, fill)
+    out[mask] = np.concatenate(data)
+    return out
 
 
-def create_y_for(datapoint: [str]) -> [str]:
+def unify_data(data, left, right, fill, length=None):
+    start_end = add_start_end(data, left, right)
+    padded = fill_na(start_end, fill, length=length)
+    return padded
+
+
+def create_y_for_timeseries(datapoint: [list], end_seq: list) -> [list]:
     try:
         y = [d[-1] for d in datapoint[1:]]
     except IndexError:
         print(datapoint)
-    y.append(' ')
+    y.append(end_seq)
     return y
 
 
@@ -131,19 +150,28 @@ def save_model(model, naming_params):
 
 class TimeseriesEncoder:
 
-    def __init__(self, x_data, window=5):
-        x_data_unified = unify_data(x_data)
+    def __init__(self, x_data, left, right, fill, window=5):
+
+        self.left = left
+        self.right = right
+        self.fill = fill
+
+        x_data_unified = unify_data(data=x_data, left=left,
+                                    right=right, fill=fill)
+
         self.char2int, self.int2char = mapping_char_int(x_data_unified)
-        self.length = max(map(len, x_data))
+        self.length = x_data_unified.shape[1]
         self.window = window
 
     def transform(self, x_data: [str]) -> (np.array, np.array):
+        x_data_unified = unify_data(data=x_data, fill=self.fill,
+                                    right=self.right, left=self.left,
+                                    length=self.length,)
 
-        x_data_unified = unify_data(x_data, self.length)
+        x_data_windowed = [timecell for x in x_data_unified
+                           for timecell in create_timeseries(x, self.window)]
 
-        x_data_windowed = []
-        [x_data_windowed.extend(create_timeseries(x, self.window)) for x in x_data_unified]
-        y_data = create_y_for(x_data_windowed)
+        y_data = create_y_for_timeseries(x_data_windowed, self.fill)
 
         x_data_encoded = np.array(encode_data(x_data_windowed, self.char2int))
         y_data_encoded = np.array(encode_data(y_data, self.char2int))
