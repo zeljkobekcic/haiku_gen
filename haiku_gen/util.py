@@ -96,7 +96,7 @@ def create_timeseries(datapoint: np.array, frame: int) -> np.array:
 
 
 def add_start_end(data, left, right) -> np.array:
-    x = np.zeros_like(data)
+    x = np.zeros_like(data, dtype=object)
     for i, v in enumerate(data):
         x[i] = np.pad(array=np.array(v, dtype=object),
                       pad_width=(1, 1),
@@ -116,12 +116,11 @@ def fill_na(data, fill, length=None):
     if length is None:
         length = lens.max()
 
-    print(length)
     # Mask of valid places in each row
     mask = np.arange(length) < lens[:, None]
 
     # Setup output array and put elements from data into masked positions
-    out = np.full(mask.shape, fill)
+    out = np.full(mask.shape, fill, dtype=object)
     out[mask] = np.concatenate(data)
     return out
 
@@ -150,23 +149,30 @@ def save_model(model, naming_params):
 
 class TimeseriesEncoder:
 
-    def __init__(self, x_data, left, right, fill, window=5):
+    def __init__(self, data, left, right, fill, window=5):
 
         self.left = left
         self.right = right
         self.fill = fill
 
-        x_data_unified = unify_data(data=x_data, left=left,
-                                    right=right, fill=fill)
+        data_unified = unify_data(data=data, left=left, right=right, fill=fill)
 
-        self.char2int, self.int2char = mapping_char_int(x_data_unified)
-        self.length = x_data_unified.shape[1]
+        self.char2int, self.int2char = mapping_char_int(data_unified)
+
+        try:
+            self.char2int[left]
+            self.char2int[right]
+            self.char2int[fill]
+        except KeyError:
+            print("NO")
+            print(data_unified.dtype)
+
+        self.length = data_unified.shape[1]
         self.window = window
 
-    def transform(self, x_data: [str]) -> (np.array, np.array):
-        x_data_unified = unify_data(data=x_data, fill=self.fill,
-                                    right=self.right, left=self.left,
-                                    length=self.length,)
+    def transform(self, data: [str]) -> (np.array, np.array):
+        x_data_unified = unify_data(data=data, fill=self.fill, right=self.right,
+                                    left=self.left, length=self.length)
 
         x_data_windowed = [timecell for x in x_data_unified
                            for timecell in create_timeseries(x, self.window)]
@@ -174,7 +180,7 @@ class TimeseriesEncoder:
         y_data = create_y_for_timeseries(x_data_windowed, self.fill)
 
         x_data_encoded = np.array(encode_data(x_data_windowed, self.char2int))
-        y_data_encoded = np.array(encode_data(y_data, self.char2int))
+        y_data_encoded = np.array(encode_datapoint(y_data, self.char2int))
 
         timeseries_num = x_data_encoded.shape[0]
         x_data_encoded_reshaped = x_data_encoded.reshape((timeseries_num, 1, -1))

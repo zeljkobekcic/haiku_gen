@@ -37,22 +37,22 @@ def encoded_shape(ts_enc: u.TimeseriesEncoder) -> int:
 
 
 def main():
-    d = u.load_data()
+    d = u.load_data('syllable')
 
     batch_size = 10
     window = 5
-    num_elements = 100
-    epochs = 1
+    num_elements = 10000
+    epochs = 10
     steps_per_epoch = num_elements // batch_size
 
     d_batch = d[:batch_size]
-    ts_enc = u.TimeseriesEncoder(d, window)
+    ts_enc = u.TimeseriesEncoder(data=d, window=window, right='<END>',
+                                 left='<START>', fill='<END>')
     batch_shape = tensor_shape(ts_enc, d_batch)
     output_shape = encoded_shape(ts_enc)
 
     model = Sequential()
-    model.add(SimpleRNN(units=400, batch_input_shape=batch_shape))
-    model.add(Dense(units=200))
+    model.add(SimpleRNN(units=200, batch_input_shape=batch_shape))
     model.add(LeakyReLU())
     model.add(Dense(units=output_shape, activation='softmax'))
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
