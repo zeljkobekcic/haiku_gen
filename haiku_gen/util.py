@@ -1,44 +1,66 @@
 import pickle as p
 import numpy as np
+import hashlib as h
+import datetime as dt
+import warnings
+import os
+import keras
 
-from functools import reduce, partial
+from functools import reduce
 from keras.utils import to_categorical
 
 
 def load_data_from(path):
-    print(path)
+    """Loads data from the given path. Basically just a nice little function
+    to easier use p.load """
     with open(path, 'rb') as infile:
         return p.load(infile)
 
 
 def load_data(method):
-
-    local_path = f'data/train_{method}.pkl'
-    floydhub_path = f'/data/train_{method}.pkl'
-
-    try:
-        return load_data_from(local_path)
-    except FileNotFoundError:
-        return load_data_from(floydhub_path)
+    """Loads data from the default path 'data/train_{method}. This is the same
+    as load_data_from(data/train_{method}.pkl)."""
+    local_path = 'data/train_{method}.pkl'.format(method=method)
+    return load_data_from(local_path)
 
 
 def load_test_data(method):
-    local_path = f'data/train_{method}.pkl'
-    floydhub_path = f'/data/train_{method}.pkl'
-
-    try:
-        return load_data_from(local_path)
-    except FileNotFoundError:
-        return load_data_from(floydhub_path)
+    """Loads data from the default path 'data/train_{method}. This is the same
+    as load_data_from(data/train_{method}.pkl)."""
+    local_path = 'data/test_{method}.pkl'.format(method=method)
+    return load_data_from(local_path)
 
 
 def encode_datapoint(datapoint: list, mapping: dict) -> list:
+    """Encodes a single datapoint with the given mapping.
+    :param datapoint: A single datapoint
+    :param mapping: A dictionary which maps the values of the elements in data
+                    to integers so that these can be mapped to an one-hot
+                    encoding.
+    For example if we had the string: 'hello' and the mapping
+    m = {'h': 0, 'e':1, 'l': 2, 'o', 3} then this function will return the
+    following:
+
+    [np.array([1 ,0, 0, 0]), # h
+     np.array([0, 1, 0, 0]), # e
+     np.array([0, 0, 1, 0]), # l
+     np.array([0, 0, 1, 0]), # l
+     np.array([0, 0, 0, 1])] # o
+    """
     return to_categorical([mapping[d] for d in datapoint],
                           len(mapping),
                           dtype='int')
 
 
 def encode_data(data: [list], mapping: dict) -> [list]:
+    """Applies encode_datapoint for a collection of datapoints.
+
+    :param data: A list of datapoints which will be passed one by one to
+                 encode_datapoint
+    :param mapping: A dictionary which maps the values of the elements in data
+                    to integers so that these can be mapped to an one-hot
+                    encoding.
+    :returns A numpy array of the lists which represent the encoded values."""
     encoded = [encode_datapoint(datapoint, mapping) for datapoint in data]
     return np.array(encoded)
 
@@ -56,7 +78,8 @@ def mapping_char_int(data: [list]) -> (dict, dict):
     """
     Creates two mappings. One from characters to numbers and one from numbers to characters.
     :param data: A collection os strings.
-    :return: Two dictionaries.
+    :return: Two dictionaries which store the mapping from our
+             data input X -> encoded data X~ and vice versa.
     """
     char_set = set_of_data_elements(data)
     char_2_int = {c: i for i, c in enumerate(char_set)}
@@ -95,7 +118,13 @@ def create_timeseries(datapoint: np.array, frame: int) -> np.array:
     return timeseries
 
 
-def add_start_end(data, left, right) -> np.array:
+def add_start_end(data: np.array, left, right) -> np.array:
+    """Adds an start and end sequence element to the datapoints.
+
+    :param data:
+    :param left, right
+    :return
+    """
     x = np.zeros_like(data, dtype=object)
     for i, v in enumerate(data):
         x[i] = np.pad(array=np.array(v, dtype=object),
@@ -126,25 +155,75 @@ def fill_na(data, fill, length=None):
 
 
 def unify_data(data, left, right, fill, length=None):
+    """padds the data so that every element has the same length.
+
+    :param data: The input data, should be an iterable collection.
+    :param left, right: Elements which will be added to the datapoints to
+                              mark the start, end of an sequence.
+    :param fill: Filling elements which are shorter than others with this
+                 value.
+
+    :return The data with set start and stop sequence elements where every
+            element has the same length
+    """
     start_end = add_start_end(data, left, right)
     padded = fill_na(start_end, fill, length=length)
     return padded
 
 
 def create_y_for_timeseries(datapoint: [list], end_seq: list) -> [list]:
+    """Takes a datapoints of sequence elements and returns a list of elements
+    which contain the next sequence element from the sequencep.
+
+    :param datapoint: The input data.
+    :param end_seq: The last sequence element, because the last element in the
+                     sequence has no following element.
+    :return A corresponding y vector for the input data x.
+    """
+
     try:
         y = [d[-1] for d in datapoint[1:]]
     except IndexError:
         print(datapoint)
+
     y.append(end_seq)
     return y
 
 
-def save_model(model, naming_params):
-    import os
+def save_model(model: keras.Sequential, naming_params: {str: str},
+               directory='model/'):
+    """Saves a given model on the disk as a hdf5 file.
+
+    :param model: A keras.Sequential model
+    :param naming_params: A dictionary with keys and values for specific
+                          properties.
+    :param directory: The path to the targeted directory.
+    """
     os.makedirs('model', exist_ok=True)
-    model_name = 'arch={arch}-epochs={epochs}-num_elements={num_elements}-window={window}-batch_size={batch_size}.hdf5'
-    model.save('model/' + model_name.format(**naming_params))
+
+    naming_params['time'] = dt.datetime.now().strftime("%Y:%m:%d::%H:%M:%S")
+    naming_params['hash'] = h.sha1(model.to_json().encode()).hexdigest()
+
+    def key_and_value_to_str(key):
+        return "{key}={value}".format(key=key, value=naming_params[key])
+
+    name_parts = map(key_and_value_to_str, sorted(naming_params))
+    model_name = '-'.join(name_parts) + ".hdf5"
+    model.save(directory + '/' + model_name)
+
+
+def load_model_from_hash(model_hash: str, directory: str) -> keras.Sequential:
+    hash_field = 'hash=' + model_hash
+    files = filter(lambda x: x.endswith('.hdf5') and hash_field in x, directory)
+
+    if len(files) > 1:
+        warnings.warn("More than one model starting with the provided hash:\n" +
+                      "Using the first element in the following operations.\n" +
+                      "Provided hash: {}\n".format(model_hash) +
+                      "Direcotory: {}\n\t".format(directory) +
+                      "\n\t".join(files))
+
+    return keras.models.load_model(files[0])
 
 
 class TimeseriesEncoder:
