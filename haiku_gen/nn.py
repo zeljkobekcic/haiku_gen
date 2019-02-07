@@ -37,19 +37,23 @@ def encoded_shape(ts_enc: u.TimeseriesEncoder) -> int:
 
 
 def main():
-    d = u.load_data('syllable')
+    d = u.load_data('char')
 
     batch_size = 10
     window = 5
-    num_elements = 10000
+    num_elements = 10
     epochs = 10
     steps_per_epoch = num_elements // batch_size
 
     d_batch = d[:batch_size]
     ts_enc = u.TimeseriesEncoder(data=d, window=window, right='<END>',
                                  left='<START>', fill='<END>')
+    ts_enc.save_to_file()
     batch_shape = tensor_shape(ts_enc, d_batch)
     output_shape = encoded_shape(ts_enc)
+
+    print(batch_shape)
+    print(output_shape)
 
     model = Sequential()
     model.add(SimpleRNN(units=200, batch_input_shape=batch_shape))
@@ -60,7 +64,10 @@ def main():
     g = generator(data=d[:num_elements], ts_enc=ts_enc, batch_size=batch_size)
     model.fit_generator(g, steps_per_epoch=steps_per_epoch, epochs=epochs)
 
-    naming_params = {'arch': 'SimpleRNN', 'epochs': epochs, 'num_elements': num_elements, 'window': window,
+    naming_params = {'arch': 'SimpleRNN',
+                     'epochs': epochs,
+                     'num_elements': num_elements,
+                     'window': window,
                      'batch_size': batch_size}
 
     u.save_model(model, naming_params)
