@@ -266,3 +266,18 @@ class TimeseriesEncoder:
         y_data_encoded_reshaped = y_data_encoded.reshape((timeseries_num, -1))
 
         return x_data_encoded_reshaped, y_data_encoded_reshaped
+
+    def save_to_file(self, path="model/timeseries_encoder/"):
+        naming_params_dict = {"dimension": len(self.char2int),
+                              "sequence_length": self.length,
+                              "left": self.left,
+                              "right": self.right,
+                              "fill": self.fill,
+                              "window": self.window}
+        naming_params = [str(k) + "=" + str(naming_params_dict[k]) for k in naming_params_dict]
+        filename = "-".join(naming_params) + '.pkl'
+        filepath = path + "/" + filename
+        print(filepath)
+        with open(filepath, 'wb') as outfile:
+            p.dump(self, outfile)
+
